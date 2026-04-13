@@ -1,0 +1,171 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — MongoDB 3-Node ReplicaSet StatefulSet
+# ════════════════════════════════════════════════════════════
+# Deploys a 3-member MongoDB ReplicaSet for high availability
+# and automatic data replication across pods.
+#
+# Each pod gets its own NFS-backed PVC via volumeClaimTemplates.
+# The NFS provisioner (nfs-dynamic StorageClass) auto-creates
+# PVs — no hostPath, no nodeAffinity, no taints needed.
+#
+# Pods created (stable DNS via headless service):
+#   medimesh-mongodb-0.medimesh-mongodb.medimesh.svc.cluster.local
+#   medimesh-mongodb-1.medimesh-mongodb.medimesh.svc.cluster.local
+#   medimesh-mongodb-2.medimesh-mongodb.medimesh.svc.cluster.local
+#
+# ⚠️  IMPORTANT: After all 3 pods are Running, apply the
+#    ReplicaSet init Job to run rs.initiate():
+#    kubectl apply -f k8s/mongodb/mongodb-rs-init-job.yaml
+# ════════════════════════════════════════════════════════════
+
+# ─── Headless Service (required for StatefulSet DNS) ──────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-mongodb
+  namespace: medimesh
+  labels:
+    app: medimesh-mongodb
+    tier: database
+spec:
+  clusterIP: None
+  selector:
+    app: medimesh-mongodb
+    tier: database
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongo
+
+---
+# ─── StatefulSet (3-Member ReplicaSet) ────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: medimesh-mongodb
+  namespace: medimesh
+  labels:
+    app: medimesh-mongodb
+    tier: database
+spec:
+  serviceName: medimesh-mongodb
+  replicas: 3
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app: medimesh-mongodb
+      tier: database
+  template:
+    metadata:
+      labels:
+        app: medimesh-mongodb
+        tier: database
+    spec:
+      # ─── Spread pods across nodes for HA ──────────────────
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - medimesh-mongodb
+                topologyKey: kubernetes.io/hostname
+
+      # ─── Allow scheduling on master node if needed ────────
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+
+      containers:
+        - name: mongodb
+          image: mongo:7
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 27017
+              name: mongo
+          # ─── Start mongod with ReplicaSet enabled ──────────
+          command:
+            - mongod
+            - "--replSet"
+            - "rs0"
+            - "--bind_ip_all"
+          # ─── Environment (for diagnostics) ──────────────────
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          # ─── Health Probes ─────────────────────────────────
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - |
+                  mongosh --quiet --eval "
+                    try {
+                      var status = rs.status();
+                      var me = status.members.filter(m => m.self)[0];
+                      if (me.stateStr === 'PRIMARY' || me.stateStr === 'SECONDARY') {
+                        quit(0);
+                      }
+                      quit(1);
+                    } catch(e) {
+                      // rs not yet initiated — still pass basic ping
+                      db.adminCommand('ping');
+                    }
+                  "
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --quiet
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+  # ─── VolumeClaimTemplates (NFS-backed PVC per pod) ───────
+  # Automatically creates 3 PVCs:
+  #   mongodb-data-medimesh-mongodb-0  (5Gi, nfs-dynamic)
+  #   mongodb-data-medimesh-mongodb-1  (5Gi, nfs-dynamic)
+  #   mongodb-data-medimesh-mongodb-2  (5Gi, nfs-dynamic)
+  #
+  # Each PVC gets its own NFS subdirectory — any pod on any
+  # node can mount it. No hostPath, no nodeAffinity needed.
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: nfs-dynamic
+        resources:
+          requests:
+            storage: 5Gi

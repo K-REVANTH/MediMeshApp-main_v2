@@ -1,0 +1,17 @@
+# NFS StorageClass (Dynamic Provisioning)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.global.storage.nfs.storageClass }}
+  labels:
+    app: {{ .Values.provisioner.name }}
+    tier: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: {{ .Values.storageClass.isDefault | quote }}
+provisioner: {{ .Values.provisioner.provisionerName }}
+parameters:
+  onDelete: {{ .Values.storageClass.onDelete }}
+  pathPattern: {{ .Values.storageClass.pathPattern | quote }}
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy }}
+volumeBindingMode: {{ .Values.storageClass.volumeBindingMode }}
+allowVolumeExpansion: {{ .Values.storageClass.allowVolumeExpansion }}

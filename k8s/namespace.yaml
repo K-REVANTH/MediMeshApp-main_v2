@@ -1,0 +1,11 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — Kubernetes Namespace
+# ════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: medimesh
+  labels:
+    app: medimesh
+    project: hospital-management
+    environment: production

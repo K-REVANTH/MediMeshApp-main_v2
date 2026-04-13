@@ -1,0 +1,19 @@
+# Frontend ClusterIP Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ .Values.global.namespaces.frontend }}
+  labels:
+    app: {{ .Values.name }}
+    tier: frontend
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ .Values.name }}
+    tier: frontend
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http

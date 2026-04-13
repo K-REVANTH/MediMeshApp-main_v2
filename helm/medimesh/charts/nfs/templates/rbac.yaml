@@ -1,0 +1,64 @@
+# NFS RBAC — ServiceAccount, ClusterRole, ClusterRoleBinding, Role, RoleBinding
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.provisioner.name }}
+  namespace: {{ .Values.global.namespaces.db }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.provisioner.name }}-runner
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: run-{{ .Values.provisioner.name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.provisioner.name }}
+    namespace: {{ .Values.global.namespaces.db }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Values.provisioner.name }}-runner
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-locking-{{ .Values.provisioner.name }}
+  namespace: {{ .Values.global.namespaces.db }}
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: leader-locking-{{ .Values.provisioner.name }}
+  namespace: {{ .Values.global.namespaces.db }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.provisioner.name }}
+    namespace: {{ .Values.global.namespaces.db }}
+roleRef:
+  kind: Role
+  name: leader-locking-{{ .Values.provisioner.name }}
+  apiGroup: rbac.authorization.k8s.io

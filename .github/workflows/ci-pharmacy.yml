@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — Pharmacy Service CI Pipeline
+# ═══════════════════════════════════════════════════════════════
+# Triggers only on changes to services/medimesh-pharmacy/
+# Calls the reusable pipeline template via workflow_call.
+# ═══════════════════════════════════════════════════════════════
+
+name: "CI — Pharmacy Service"
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+    paths:
+      - 'services/medimesh-pharmacy/**'
+      - '.github/workflows/ci-pharmacy.yml'
+      - '.github/workflows/_reusable-service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/medimesh-pharmacy/**'
+
+concurrency:
+  group: ci-pharmacy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_reusable-service-pipeline.yml
+    with:
+      service-path: services/medimesh-pharmacy
+      service-name: medimesh-pharmacy
+      image-name: medimesh_medimesh-pharmacy
+    secrets: inherit

@@ -1,0 +1,397 @@
+# ═══════════════════════════════════════════════════════════
+# MediMesh — Global Values (Single Source of Truth)
+# ═══════════════════════════════════════════════════════════
+
+global:
+  imageRegistry: bharath44623
+  imageTag: "v1.1.0"
+  imagePullPolicy: Always
+  environment: production
+
+  # Namespace isolation
+  namespaces:
+    frontend: medimesh-frontend
+    backend: medimesh-backend
+    db: medimesh-db
+
+  # NFS storage config
+  storage:
+    nfs:
+      server: "172.31.90.107"
+      path: "/srv/nfs/medimesh"
+      storageClass: nfs-dynamic-medimesh
+
+  # MongoDB connection (used by all backend services)
+  mongo:
+    host: "medimesh-mongodb"
+    port: 27017
+    replicaSet: rs0
+    replicas: 3
+
+  # Shared secrets (base64 encoded)
+  secrets:
+    jwtSecret: "bWVkaW1lc2gtand0LXNlY3JldC0yMDI0"
+    adminUsername: "YWRtaW4="
+    adminPassword: "cGFzc3dvcmQxMjM="
+    mongoRootUsername: "bWVkaW1lc2hBZG1pbg=="
+    mongoRootPassword: "bWVkaW1lc2hQYXNzMjAyNA=="
+
+# ─── Frontend ─────────────────────────────────────────────
+frontend:
+  name: medimesh-frontend
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-frontend
+    tag: "v2.1.0"
+  containerPort: 80
+  service:
+    name: medimesh-frontend-svc
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  sidecar:
+    image: busybox:1.36
+    resources:
+      requests:
+        cpu: "25m"
+        memory: "32Mi"
+      limits:
+        cpu: "50m"
+        memory: "64Mi"
+  readinessProbe:
+    path: /
+    port: 80
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+  livenessProbe:
+    path: /
+    port: 80
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+  strategy:
+    type: RollingUpdate
+    maxUnavailable: 1
+    maxSurge: 1
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilization: 60
+  gateway:
+    enabled: true
+    name: medimesh-gateway
+    className: kgateway
+    listeners:
+      - name: http
+        protocol: HTTP
+        port: 80
+    httpRoute:
+      name: medimesh-routes
+
+# ─── BFF ──────────────────────────────────────────────────
+bff:
+  name: medimesh-bff
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-bff
+    tag: "v1.1.0"
+  containerPort: 5010
+  service:
+    name: medimesh-bff-svc
+    type: ClusterIP
+    port: 5010
+    targetPort: 5010
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  readinessProbe:
+    path: /health
+    port: 5010
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+  livenessProbe:
+    path: /health
+    port: 5010
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 5
+  strategy:
+    type: RollingUpdate
+    maxUnavailable: 1
+    maxSurge: 1
+
+# ─── Auth Service ─────────────────────────────────────────
+auth:
+  name: medimesh-auth
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-auth
+    tag: "v1.1.0"
+  containerPort: 5001
+  dbName: medimesh-auth-db
+  service:
+    name: medimesh-auth-svc
+    port: 5001
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv: []
+
+# ─── User Service ─────────────────────────────────────────
+user:
+  name: medimesh-user
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-user
+    tag: "v1.1.0"
+  containerPort: 5002
+  dbName: medimesh-user-db
+  service:
+    name: medimesh-user-svc
+    port: 5002
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv:
+    - name: DOCTOR_SERVICE_URL
+      value: "http://medimesh-doctor-svc.medimesh-backend.svc.cluster.local:5003"
+    - name: AMBULANCE_SERVICE_URL
+      value: "http://medimesh-ambulance-svc.medimesh-backend.svc.cluster.local:5007"
+    - name: PHARMACY_SERVICE_URL
+      value: "http://medimesh-pharmacy-svc.medimesh-backend.svc.cluster.local:5006"
+
+# ─── Doctor Service ───────────────────────────────────────
+doctor:
+  name: medimesh-doctor
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-doctor
+    tag: "v1.1.0"
+  containerPort: 5003
+  dbName: medimesh-doctor-db
+  service:
+    name: medimesh-doctor-svc
+    port: 5003
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv: []
+
+# ─── Appointment Service ─────────────────────────────────
+appointment:
+  name: medimesh-appointment
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-appointment
+    tag: "v1.1.0"
+  containerPort: 5004
+  dbName: medimesh-appointment-db
+  service:
+    name: medimesh-appointment-svc
+    port: 5004
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv: []
+
+# ─── Vitals Service ──────────────────────────────────────
+vitals:
+  name: medimesh-vitals
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-vitals
+    tag: "v1.1.0"
+  containerPort: 5005
+  dbName: medimesh-vitals-db
+  service:
+    name: medimesh-vitals-svc
+    port: 5005
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv: []
+
+# ─── Pharmacy Service ────────────────────────────────────
+pharmacy:
+  name: medimesh-pharmacy
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-pharmacy
+    tag: "v1.1.0"
+  containerPort: 5006
+  dbName: medimesh-pharmacy-db
+  service:
+    name: medimesh-pharmacy-svc
+    port: 5006
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv: []
+
+# ─── Ambulance Service ───────────────────────────────────
+ambulance:
+  name: medimesh-ambulance
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-ambulance
+    tag: "v1.1.0"
+  containerPort: 5007
+  dbName: medimesh-ambulance-db
+  service:
+    name: medimesh-ambulance-svc
+    port: 5007
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv: []
+
+# ─── Complaint Service ───────────────────────────────────
+complaint:
+  name: medimesh-complaint
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-complaint
+    tag: "v1.1.0"
+  containerPort: 5008
+  dbName: medimesh-complaint-db
+  service:
+    name: medimesh-complaint-svc
+    port: 5008
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv: []
+
+# ─── Forum Service ───────────────────────────────────────
+forum:
+  name: medimesh-forum
+  replicas: 2
+  image:
+    repository: bharath44623/medimesh_medimesh-forum
+    tag: "v1.1.0"
+  containerPort: 5009
+  dbName: medimesh-forum-db
+  service:
+    name: medimesh-forum-svc
+    port: 5009
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  extraEnv: []
+
+# ─── MongoDB ─────────────────────────────────────────────
+mongo:
+  name: medimesh-mongodb
+  replicas: 3
+  image:
+    repository: mongo
+    tag: "7"
+    pullPolicy: IfNotPresent
+  containerPort: 27017
+  replicaSetName: rs0
+  service:
+    name: medimesh-mongodb
+    port: 27017
+    targetPort: 27017
+  storage:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+  rsInitJob:
+    name: mongodb-rs-init
+    backoffLimit: 5
+    activeDeadlineSeconds: 300
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+
+# ─── NFS Provisioner ─────────────────────────────────────
+nfs:
+  enabled: true
+  provisioner:
+    name: nfs-client-provisioner
+    image:
+      repository: registry.k8s.io/sig-storage/nfs-subdir-external-provisioner
+      tag: "v4.0.2"
+      pullPolicy: IfNotPresent
+    provisionerName: medimesh/nfs-subdir-external-provisioner
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+  storageClass:
+    isDefault: false
+    onDelete: retain
+    reclaimPolicy: Retain
+    volumeBindingMode: Immediate
+    allowVolumeExpansion: true
+    pathPattern: "${.PVC.namespace}-${.PVC.name}"

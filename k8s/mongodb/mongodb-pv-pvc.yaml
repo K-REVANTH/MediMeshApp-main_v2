@@ -1,0 +1,33 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — MongoDB Storage (Reference File)
+# ════════════════════════════════════════════════════════════
+#
+# ℹ️  PVCs are created AUTOMATICALLY by the StatefulSet's
+#    volumeClaimTemplates using the nfs-dynamic StorageClass.
+#
+# The StatefulSet auto-creates these 3 PVCs:
+#   ┌────────────────────────────────────┬──────┬─────────────┐
+#   │ PVC Name                           │ Size │ StorageClass│
+#   ├────────────────────────────────────┼──────┼─────────────┤
+#   │ mongodb-data-medimesh-mongodb-0    │ 5Gi  │ nfs-dynamic │
+#   │ mongodb-data-medimesh-mongodb-1    │ 5Gi  │ nfs-dynamic │
+#   │ mongodb-data-medimesh-mongodb-2    │ 5Gi  │ nfs-dynamic │
+#   └────────────────────────────────────┴──────┴─────────────┘
+#
+# Each PVC is backed by an NFS subdirectory on the NFS server
+# at /srv/nfs/medimesh/<namespace>-<pvcName>/
+#
+# How it works:
+#   1. StatefulSet creates PVC (volumeClaimTemplates)
+#   2. NFS provisioner sees PVC with storageClassName: nfs-dynamic
+#   3. Provisioner creates NFS subdirectory + PV
+#   4. PVC binds to PV → pod mounts NFS directory at /data/db
+#
+# Verify PVCs:
+#   kubectl get pvc -n medimesh -l app=medimesh-mongodb
+#
+# Verify PVs:
+#   kubectl get pv | grep medimesh-mongodb
+#
+# DO NOT apply this file — it is documentation only.
+# ════════════════════════════════════════════════════════════

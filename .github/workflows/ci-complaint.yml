@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — Complaint Service CI Pipeline
+# ═══════════════════════════════════════════════════════════════
+# Triggers only on changes to services/medimesh-complaint/
+# Calls the reusable pipeline template via workflow_call.
+# ═══════════════════════════════════════════════════════════════
+
+name: "CI — Complaint Service"
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+    paths:
+      - 'services/medimesh-complaint/**'
+      - '.github/workflows/ci-complaint.yml'
+      - '.github/workflows/_reusable-service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/medimesh-complaint/**'
+
+concurrency:
+  group: ci-complaint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_reusable-service-pipeline.yml
+    with:
+      service-path: services/medimesh-complaint
+      service-name: medimesh-complaint
+      image-name: medimesh_medimesh-complaint
+    secrets: inherit

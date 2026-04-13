@@ -1,0 +1,68 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — NFS Subdir External Provisioner Deployment
+# ════════════════════════════════════════════════════════════
+# This deploys the nfs-subdir-external-provisioner which
+# watches for PVCs with storageClassName: nfs-dynamic and
+# auto-creates PVs backed by NFS subdirectories.
+#
+# ⚠️  IMPORTANT: Replace <NFS_SERVER_PRIVATE_IP> with the
+#    actual private IP of your HAProxy/NFS EC2 instance.
+#
+#    Find it with (on the NFS server):
+#      hostname -I | awk '{print $1}'
+# ════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-client-provisioner
+  namespace: medimesh
+  labels:
+    app: nfs-client-provisioner
+    tier: storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+        tier: storage
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      containers:
+        - name: nfs-client-provisioner
+          image: registry.k8s.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
+          imagePullPolicy: IfNotPresent
+          env:
+            # Must match the provisioner name in StorageClass
+            - name: PROVISIONER_NAME
+              value: medimesh/nfs-subdir-external-provisioner
+            # ──────────────────────────────────────────────
+            # ⚠️  REPLACE with your NFS server's PRIVATE IP
+            # ──────────────────────────────────────────────
+            - name: NFS_SERVER
+              value: "<NFS_SERVER_PRIVATE_IP>"
+            - name: NFS_PATH
+              value: "/srv/nfs/medimesh"
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            # ──────────────────────────────────────────────
+            # ⚠️  REPLACE with your NFS server's PRIVATE IP
+            # ──────────────────────────────────────────────
+            server: "<NFS_SERVER_PRIVATE_IP>"
+            path: "/srv/nfs/medimesh"

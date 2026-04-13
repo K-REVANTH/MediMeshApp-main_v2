@@ -1,0 +1,40 @@
+# Allow: BFF → Backend microservices (inter-service in backend namespace)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-bff-to-backend
+  namespace: {{ .Values.global.namespaces.backend }}
+  labels:
+    {{- include "medimesh.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      tier: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from any pod in same namespace (backend ↔ backend)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              medimesh/tier: backend
+---
+# Allow: Backend egress within own namespace (inter-service calls)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-internal-egress
+  namespace: {{ .Values.global.namespaces.backend }}
+  labels:
+    {{- include "medimesh.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      tier: backend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              medimesh/tier: backend

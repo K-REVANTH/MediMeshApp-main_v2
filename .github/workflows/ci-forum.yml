@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — Forum Service CI Pipeline
+# ═══════════════════════════════════════════════════════════════
+# Triggers only on changes to services/medimesh-forum/
+# Calls the reusable pipeline template via workflow_call.
+# ═══════════════════════════════════════════════════════════════
+
+name: "CI — Forum Service"
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+    paths:
+      - 'services/medimesh-forum/**'
+      - '.github/workflows/ci-forum.yml'
+      - '.github/workflows/_reusable-service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/medimesh-forum/**'
+
+concurrency:
+  group: ci-forum-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_reusable-service-pipeline.yml
+    with:
+      service-path: services/medimesh-forum
+      service-name: medimesh-forum
+      image-name: medimesh_medimesh-forum
+    secrets: inherit

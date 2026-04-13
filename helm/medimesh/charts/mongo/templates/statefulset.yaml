@@ -1,0 +1,104 @@
+# MongoDB StatefulSet (3-Member ReplicaSet)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.global.namespaces.db }}
+  labels:
+    app: {{ .Values.name }}
+    tier: database
+    app.kubernetes.io/part-of: medimesh
+spec:
+  serviceName: {{ .Values.name }}
+  replicas: {{ .Values.replicas }}
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+      tier: database
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+        tier: database
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ .Values.name }}
+                topologyKey: kubernetes.io/hostname
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mongodb
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+              name: mongo
+          command:
+            - mongod
+            - "--replSet"
+            - {{ .Values.replicaSetName | quote }}
+            - "--bind_ip_all"
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - |
+                  mongosh --quiet --eval "
+                    try {
+                      var s = rs.status();
+                      var me = s.members.filter(m => m.self)[0];
+                      if (me.stateStr === 'PRIMARY' || me.stateStr === 'SECONDARY') { quit(0); }
+                      quit(1);
+                    } catch(e) { db.adminCommand('ping'); }
+                  "
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+          resources:
+            requests:
+              memory: {{ .Values.resources.requests.memory | quote }}
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.resources.limits.memory | quote }}
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: {{ .Values.global.storage.nfs.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.storage.size }}

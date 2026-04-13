@@ -1,0 +1,248 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — Reusable Service CI Pipeline
+# ═══════════════════════════════════════════════════════════════
+# Single reusable template for ALL microservices.
+# Called by each ci-<service>.yml via workflow_call.
+#
+# Pipeline: Lint → Test + Snyk (parallel) → Docker Build & Push
+#
+# Security enforcement:
+#   - ESLint: strict (no || true)
+#   - Snyk: enforced (no continue-on-error)
+#   - Missing secrets = instant failure
+# ═══════════════════════════════════════════════════════════════
+
+name: Reusable Service CI Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      service-path:
+        required: true
+        type: string
+        description: 'Path to the service (e.g., services/medimesh-auth)'
+      service-name:
+        required: true
+        type: string
+        description: 'Service name (e.g., medimesh-auth)'
+      image-name:
+        required: true
+        type: string
+        description: 'Docker image name (e.g., medimesh_medimesh-auth)'
+      node-version:
+        required: false
+        type: string
+        default: '18'
+        description: 'Node.js version'
+      docker-registry:
+        required: false
+        type: string
+        default: 'docker.io'
+        description: 'Docker registry'
+      docker-user:
+        required: false
+        type: string
+        default: 'bharath44623'
+        description: 'Docker Hub username'
+    secrets:
+      SNYK_TOKEN:
+        required: true
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  # ══════════════════════════════════════════════════════════
+  # STAGE 1: Lint & Code Quality
+  # ══════════════════════════════════════════════════════════
+  lint:
+    name: "🔍 Lint — ${{ inputs.service-name }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js ${{ inputs.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.service-path }}/package.json
+
+      - name: 📦 Install Dependencies
+        working-directory: ${{ inputs.service-path }}
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "⚠️ No package-lock.json found — using npm install."
+            echo "   Recommendation: Run 'npm install' locally and commit package-lock.json"
+            npm install --no-audit
+          fi
+
+      - name: 🔍 Run ESLint (Strict — failures block the pipeline)
+        working-directory: ${{ inputs.service-path }}
+        run: npx eslint . --ext .js,.jsx --format stylish --no-error-on-unmatched-pattern
+        # ❌ No "|| true" — lint errors FAIL the build
+
+  # ══════════════════════════════════════════════════════════
+  # STAGE 2a: Unit Tests & Coverage
+  # ══════════════════════════════════════════════════════════
+  test:
+    name: "🧪 Test — ${{ inputs.service-name }}"
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js ${{ inputs.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ inputs.service-path }}/package.json
+
+      - name: 📦 Install Dependencies
+        working-directory: ${{ inputs.service-path }}
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit
+          fi
+
+      - name: 🧪 Run Unit Tests with Coverage
+        working-directory: ${{ inputs.service-path }}
+        run: npm test -- --ci --coverage --forceExit --detectOpenHandles
+        env:
+          JWT_SECRET: test-jwt-secret
+          MONGO_URI: mongodb://localhost:27017/test-db
+          NODE_ENV: test
+
+      - name: 📊 Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ inputs.service-name }}
+          path: ${{ inputs.service-path }}/coverage/
+          retention-days: 7
+
+  # ══════════════════════════════════════════════════════════
+  # STAGE 2b: Snyk SCA (runs parallel to tests)
+  # ══════════════════════════════════════════════════════════
+  snyk:
+    name: "🛡️ Snyk SCA — ${{ inputs.service-name }}"
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: 📦 Install Dependencies
+        working-directory: ${{ inputs.service-path }}
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit
+          fi
+
+      - name: 🔐 Validate Snyk Token
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -z "${SNYK_TOKEN}" ]; then
+            echo "══════════════════════════════════════════════════════════"
+            echo "❌ FATAL: SNYK_TOKEN secret is not configured!"
+            echo ""
+            echo "  Security scanning CANNOT be skipped."
+            echo "  Configure it at:"
+            echo "  GitHub → Repository → Settings → Secrets → Actions"
+            echo "══════════════════════════════════════════════════════════"
+            exit 1
+          fi
+          echo "✅ SNYK_TOKEN is configured."
+
+      - name: 🛡️ Run Snyk Security Scan (Enforced)
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --file=${{ inputs.service-path }}/package.json
+        # ❌ No continue-on-error — high/critical vulns FAIL the build
+
+  # ══════════════════════════════════════════════════════════
+  # STAGE 3: Docker Build & Push
+  # ══════════════════════════════════════════════════════════
+  docker-build:
+    name: "🐳 Docker Build — ${{ inputs.service-name }}"
+    needs: [test, snyk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.docker-registry }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🏷️ Generate Image Tags
+        id: tags
+        run: |
+          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          BRANCH="${{ github.ref_name }}"
+          BASE="${{ inputs.docker-user }}/${{ inputs.image-name }}"
+
+          # Always tag with SHA for traceability
+          TAGS="${BASE}:sha-${SHA_SHORT}"
+          TAGS="${TAGS},${BASE}:${BRANCH}"
+
+          # Tag with 'latest' only on main branch
+          if [ "${BRANCH}" = "main" ]; then
+            TAGS="${TAGS},${BASE}:latest"
+          fi
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "sha-tag=sha-${SHA_SHORT}" >> $GITHUB_OUTPUT
+          echo "📦 Tags: ${TAGS}"
+
+      - name: 🏗️ Build & Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.service-path }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.title=${{ inputs.service-name }}
+
+      - name: 📝 Save Build Metadata (for security-gate.yml)
+        run: |
+          mkdir -p build-meta
+          echo "${{ inputs.docker-user }}/${{ inputs.image-name }}:${{ steps.tags.outputs.sha-tag }}" > build-meta/image-ref.txt
+          echo "${{ inputs.service-name }}" > build-meta/service-name.txt
+          echo "${{ github.sha }}" > build-meta/commit-sha.txt
+
+      - name: 📤 Upload Build Metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-meta-${{ inputs.service-name }}
+          path: build-meta/
+          retention-days: 1

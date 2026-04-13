@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — Doctor Service CI Pipeline
+# ═══════════════════════════════════════════════════════════════
+# Triggers only on changes to services/medimesh-doctor/
+# Calls the reusable pipeline template via workflow_call.
+# ═══════════════════════════════════════════════════════════════
+
+name: "CI — Doctor Service"
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+    paths:
+      - 'services/medimesh-doctor/**'
+      - '.github/workflows/ci-doctor.yml'
+      - '.github/workflows/_reusable-service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/medimesh-doctor/**'
+
+concurrency:
+  group: ci-doctor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_reusable-service-pipeline.yml
+    with:
+      service-path: services/medimesh-doctor
+      service-name: medimesh-doctor
+      image-name: medimesh_medimesh-doctor
+    secrets: inherit

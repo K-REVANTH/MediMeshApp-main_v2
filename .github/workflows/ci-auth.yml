@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — Auth Service CI Pipeline
+# ═══════════════════════════════════════════════════════════════
+# Triggers only on changes to services/medimesh-auth/
+# Calls the reusable pipeline template via workflow_call.
+# ═══════════════════════════════════════════════════════════════
+
+name: "CI — Auth Service"
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+    paths:
+      - 'services/medimesh-auth/**'
+      - '.github/workflows/ci-auth.yml'
+      - '.github/workflows/_reusable-service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/medimesh-auth/**'
+
+concurrency:
+  group: ci-auth-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_reusable-service-pipeline.yml
+    with:
+      service-path: services/medimesh-auth
+      service-name: medimesh-auth
+      image-name: medimesh_medimesh-auth
+    secrets: inherit

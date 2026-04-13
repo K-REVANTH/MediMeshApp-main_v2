@@ -1,0 +1,86 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — Helm Chart Validation (Post-Build Orchestrator)
+# ═══════════════════════════════════════════════════════════════
+# Triggered via workflow_run after ANY service CI pipeline completes.
+# Also triggered directly on push to helm/ directory changes.
+# Validates Helm chart integrity: dependency build, lint, dry-run.
+# ═══════════════════════════════════════════════════════════════
+
+name: "⎈ Helm Validation"
+
+on:
+  # Trigger after any service pipeline completes
+  workflow_run:
+    workflows:
+      - "CI — Auth Service"
+      - "CI — User Service"
+      - "CI — Doctor Service"
+      - "CI — Appointment Service"
+      - "CI — Vitals Service"
+      - "CI — Pharmacy Service"
+      - "CI — Ambulance Service"
+      - "CI — Complaint Service"
+      - "CI — Forum Service"
+      - "CI — BFF Service"
+      - "CI — Frontend Service"
+    types: [completed]
+
+  # Also trigger directly on Helm chart changes
+  push:
+    branches: [main, develop, 'feature/**']
+    paths:
+      - 'helm/**'
+      - '.github/workflows/helm-validate.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'helm/**'
+
+concurrency:
+  group: helm-validate-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: "⎈ Lint & Validate Helm Charts"
+    runs-on: ubuntu-latest
+    # Run if: direct push/PR OR triggering workflow succeeded
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: ⎈ Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: 📦 Build Helm Dependencies
+        working-directory: helm/medimesh
+        run: helm dependency build
+
+      - name: ⎈ Lint Helm Chart (Strict)
+        working-directory: helm/medimesh
+        run: helm lint . --strict
+
+      - name: 📋 Helm Template Render (Dry-Run Validation)
+        working-directory: helm/medimesh
+        run: |
+          echo "🔍 Rendering Helm templates (dry-run)..."
+          helm template medimesh . --debug > /dev/null
+          echo "✅ Helm template rendering successful"
+
+      - name: 📊 Helm Chart Summary
+        run: |
+          echo "═══════════════════════════════════════════════════"
+          echo "  ⎈ Helm Validation — PASSED"
+          echo "═══════════════════════════════════════════════════"
+          echo "  Chart: helm/medimesh"
+          echo "  Commit: ${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo "  Branch: ${{ github.event.workflow_run.head_branch || github.ref_name }}"
+          echo "═══════════════════════════════════════════════════"

@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"annotations":{},"name":"allow-gateway-pods-to-kgateway","namespace":"kgateway-system"},"spec":{"ingress":[{"from":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"medimesh-frontend"}}}],"ports":[{"port":9977,"protocol":"TCP"}]}],"podSelector":{"matchLabels":{"app.kubernetes.io/name":"kgateway"}},"policyTypes":["Ingress"]}}
+  creationTimestamp: "2026-04-11T06:36:41Z"
+  generation: 1
+  name: allow-gateway-pods-to-kgateway
+  namespace: kgateway-system
+  resourceVersion: "236592"
+  uid: 4ecf37cd-7166-4e63-9269-c5d8d2dcc43c
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: medimesh-frontend
+    ports:
+    - port: 9977
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kgateway
+  policyTypes:
+  - Ingress

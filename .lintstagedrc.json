@@ -1,0 +1,6 @@
+{
+  "services/**/*.js": ["eslint --fix --no-error-on-unmatched-pattern"],
+  "medimesh-bff/**/*.js": ["eslint --fix --no-error-on-unmatched-pattern"],
+  "medimesh-frontend/src/**/*.{js,jsx}": ["eslint --fix --no-error-on-unmatched-pattern"],
+  "*.{json,yml,yaml}": ["prettier --write --ignore-unknown"]
+}

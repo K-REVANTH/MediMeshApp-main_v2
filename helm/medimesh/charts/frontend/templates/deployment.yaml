@@ -1,0 +1,78 @@
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.global.namespaces.frontend }}
+  labels:
+    app: {{ .Values.name }}
+    tier: frontend
+    app.kubernetes.io/part-of: medimesh
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+      tier: frontend
+  strategy:
+    type: {{ .Values.strategy.type }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.strategy.maxUnavailable }}
+      maxSurge: {{ .Values.strategy.maxSurge }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+        tier: frontend
+    spec:
+      containers:
+        - name: {{ .Values.name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+              name: http
+          env:
+            - name: BFF_SERVICE_URL
+              value: "http://medimesh-bff-svc.{{ .Values.global.namespaces.backend }}.svc.cluster.local:5010"
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.path }}
+              port: {{ .Values.readinessProbe.port }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.path }}
+              port: {{ .Values.livenessProbe.port }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          volumeMounts:
+            - name: nginx-logs
+              mountPath: /var/log/nginx
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              memory: {{ .Values.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              memory: {{ .Values.resources.limits.memory | quote }}
+        # Log aggregator sidecar
+        - name: log-sidecar
+          image: {{ .Values.sidecar.image }}
+          command: ["sh", "-c", "while true; do tail -f /var/log/nginx/access.log /var/log/nginx/error.log 2>/dev/null; sleep 2; done"]
+          volumeMounts:
+            - name: nginx-logs
+              mountPath: /var/log/nginx
+          resources:
+            requests:
+              cpu: {{ .Values.sidecar.resources.requests.cpu | quote }}
+              memory: {{ .Values.sidecar.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.sidecar.resources.limits.cpu | quote }}
+              memory: {{ .Values.sidecar.resources.limits.memory | quote }}
+      volumes:
+        - name: nginx-logs
+          emptyDir: {}

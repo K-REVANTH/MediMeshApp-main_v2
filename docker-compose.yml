@@ -1,0 +1,212 @@
+version: '3.8'
+
+services:
+  # ─── MongoDB ────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: medimesh-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Auth Service ──────────────────────────────────────
+  medimesh-auth:
+    build: ./services/medimesh-auth
+    container_name: medimesh-auth
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-auth-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── User Service ──────────────────────────────────────
+  medimesh-user:
+    build: ./services/medimesh-user
+    container_name: medimesh-user
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-user-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+      - DOCTOR_SERVICE_URL=http://medimesh-doctor:5003
+      - AMBULANCE_SERVICE_URL=http://medimesh-ambulance:5007
+      - PHARMACY_SERVICE_URL=http://medimesh-pharmacy:5006
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Doctor Service ────────────────────────────────────
+  medimesh-doctor:
+    build: ./services/medimesh-doctor
+    container_name: medimesh-doctor
+    ports:
+      - "5003:5003"
+    environment:
+      - PORT=5003
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-doctor-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Appointment Service ───────────────────────────────
+  medimesh-appointment:
+    build: ./services/medimesh-appointment
+    container_name: medimesh-appointment
+    ports:
+      - "5004:5004"
+    environment:
+      - PORT=5004
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-appointment-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Vitals Service ────────────────────────────────────
+  medimesh-vitals:
+    build: ./services/medimesh-vitals
+    container_name: medimesh-vitals
+    ports:
+      - "5005:5005"
+    environment:
+      - PORT=5005
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-vitals-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Pharmacy Service ──────────────────────────────────
+  medimesh-pharmacy:
+    build: ./services/medimesh-pharmacy
+    container_name: medimesh-pharmacy
+    ports:
+      - "5006:5006"
+    environment:
+      - PORT=5006
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-pharmacy-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Ambulance Service ─────────────────────────────────
+  medimesh-ambulance:
+    build: ./services/medimesh-ambulance
+    container_name: medimesh-ambulance
+    ports:
+      - "5007:5007"
+    environment:
+      - PORT=5007
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-ambulance-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Complaint Service ─────────────────────────────────
+  medimesh-complaint:
+    build: ./services/medimesh-complaint
+    container_name: medimesh-complaint
+    ports:
+      - "5008:5008"
+    environment:
+      - PORT=5008
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-complaint-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Forum Service ─────────────────────────────────────
+  medimesh-forum:
+    build: ./services/medimesh-forum
+    container_name: medimesh-forum
+    ports:
+      - "5009:5009"
+    environment:
+      - PORT=5009
+      - MONGO_URI=mongodb://mongodb:27017/medimesh-forum-db
+      - JWT_SECRET=medimesh-jwt-secret-2024
+    depends_on:
+      - mongodb
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── BFF Service ───────────────────────────────────────
+  medimesh-bff:
+    build: ./medimesh-bff
+    container_name: medimesh-bff
+    ports:
+      - "5010:5010"
+    environment:
+      - PORT=5010
+      - JWT_SECRET=medimesh-jwt-secret-2024
+      - AUTH_SERVICE_URL=http://medimesh-auth:5001
+      - USER_SERVICE_URL=http://medimesh-user:5002
+      - DOCTOR_SERVICE_URL=http://medimesh-doctor:5003
+      - APPOINTMENT_SERVICE_URL=http://medimesh-appointment:5004
+      - VITALS_SERVICE_URL=http://medimesh-vitals:5005
+      - PHARMACY_SERVICE_URL=http://medimesh-pharmacy:5006
+      - AMBULANCE_SERVICE_URL=http://medimesh-ambulance:5007
+      - COMPLAINT_SERVICE_URL=http://medimesh-complaint:5008
+      - FORUM_SERVICE_URL=http://medimesh-forum:5009
+    depends_on:
+      - medimesh-auth
+      - medimesh-user
+      - medimesh-doctor
+      - medimesh-appointment
+      - medimesh-vitals
+      - medimesh-pharmacy
+      - medimesh-ambulance
+      - medimesh-complaint
+      - medimesh-forum
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+  # ─── Frontend ──────────────────────────────────────────
+  medimesh-frontend:
+    build: ./medimesh-frontend
+    container_name: medimesh-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - medimesh-bff
+    networks:
+      - medimesh-network
+    restart: unless-stopped
+
+networks:
+  medimesh-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

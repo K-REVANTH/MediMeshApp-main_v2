@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mongo
+description: MediMesh MongoDB StatefulSet with ReplicaSet
+type: application
+version: 1.0.0
+appVersion: "7"

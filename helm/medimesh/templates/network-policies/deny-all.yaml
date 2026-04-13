@@ -1,0 +1,41 @@
+# Default Deny — Frontend namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-frontend
+  namespace: {{ .Values.global.namespaces.frontend }}
+  labels:
+    {{- include "medimesh.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Default Deny — Backend namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-backend
+  namespace: {{ .Values.global.namespaces.backend }}
+  labels:
+    {{- include "medimesh.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Default Deny — Database namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-db
+  namespace: {{ .Values.global.namespaces.db }}
+  labels:
+    {{- include "medimesh.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

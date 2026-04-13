@@ -1,0 +1,55 @@
+{
+  "root": true,
+  "env": {
+    "node": true,
+    "es2021": true,
+    "jest": true
+  },
+  "extends": ["eslint:recommended"],
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_|next|req|res" }],
+    "no-console": "off",
+    "no-undef": "error",
+    "eqeqeq": ["warn", "always"],
+    "no-var": "error",
+    "prefer-const": "warn",
+    "no-duplicate-imports": "error",
+    "no-process-exit": "off"
+  },
+  "overrides": [
+    {
+      "files": ["medimesh-frontend/src/**/*.{js,jsx}"],
+      "env": {
+        "browser": true,
+        "node": false
+      },
+      "parserOptions": {
+        "ecmaFeatures": { "jsx": true },
+        "sourceType": "module"
+      },
+      "rules": {
+        "no-undef": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.js", "**/*.spec.js"],
+      "env": {
+        "jest": true
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules/",
+    "build/",
+    "dist/",
+    "coverage/",
+    "helm/",
+    "k8s/",
+    "*.yaml",
+    "*.yml"
+  ]
+}

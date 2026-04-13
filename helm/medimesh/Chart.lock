@@ -1,0 +1,42 @@
+dependencies:
+- name: frontend
+  repository: file://charts/frontend
+  version: 1.0.0
+- name: bff
+  repository: file://charts/bff
+  version: 1.0.0
+- name: auth
+  repository: file://charts/auth
+  version: 1.0.0
+- name: user
+  repository: file://charts/user
+  version: 1.0.0
+- name: doctor
+  repository: file://charts/doctor
+  version: 1.0.0
+- name: appointment
+  repository: file://charts/appointment
+  version: 1.0.0
+- name: vitals
+  repository: file://charts/vitals
+  version: 1.0.0
+- name: pharmacy
+  repository: file://charts/pharmacy
+  version: 1.0.0
+- name: ambulance
+  repository: file://charts/ambulance
+  version: 1.0.0
+- name: complaint
+  repository: file://charts/complaint
+  version: 1.0.0
+- name: forum
+  repository: file://charts/forum
+  version: 1.0.0
+- name: mongo
+  repository: file://charts/mongo
+  version: 1.0.0
+- name: nfs
+  repository: file://charts/nfs
+  version: 1.0.0
+digest: sha256:6e1d0b7d7fcb52cfff269a357c0a5b0923236b2409d78cad80edb1be3c8bdf27
+generated: "2026-04-03T10:50:41.628641096Z"

@@ -1,0 +1,26 @@
+# Namespace: Frontend
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.global.namespaces.frontend }}
+  labels:
+    app.kubernetes.io/part-of: medimesh
+    medimesh/tier: frontend
+---
+# Namespace: Backend
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.global.namespaces.backend }}
+  labels:
+    app.kubernetes.io/part-of: medimesh
+    medimesh/tier: backend
+---
+# Namespace: Database
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.global.namespaces.db }}
+  labels:
+    app.kubernetes.io/part-of: medimesh
+    medimesh/tier: database

@@ -1,0 +1,133 @@
+# kGateway
+{{- if .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  namespace: {{ .Values.global.namespaces.frontend }}
+  labels:
+    app: {{ .Values.gateway.name }}
+    tier: frontend
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  listeners:
+  {{- range .Values.gateway.listeners }}
+  - name: {{ .name }}
+    protocol: {{ .protocol }}
+    port: {{ .port }}
+    allowedRoutes:
+      namespaces:
+        from: All
+  {{- end }}
+---
+# HTTPRoute — All Routes
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Values.gateway.httpRoute.name }}
+  namespace: {{ .Values.global.namespaces.frontend }}
+spec:
+  parentRefs:
+  - name: {{ .Values.gateway.name }}
+    namespace: {{ .Values.global.namespaces.frontend }}
+  rules:
+  # BFF (/api)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api
+    backendRefs:
+    - name: medimesh-bff-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5010
+  # Auth (/auth)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /auth
+    backendRefs:
+    - name: medimesh-auth-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5001
+  # User (/user)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /user
+    backendRefs:
+    - name: medimesh-user-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5002
+  # Doctor (/doctor)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /doctor
+    backendRefs:
+    - name: medimesh-doctor-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5003
+  # Appointment (/appointment)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /appointment
+    backendRefs:
+    - name: medimesh-appointment-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5004
+  # Vitals (/vitals)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /vitals
+    backendRefs:
+    - name: medimesh-vitals-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5005
+  # Pharmacy (/pharmacy)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /pharmacy
+    backendRefs:
+    - name: medimesh-pharmacy-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5006
+  # Ambulance (/ambulance)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /ambulance
+    backendRefs:
+    - name: medimesh-ambulance-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5007
+  # Complaint (/complaint)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /complaint
+    backendRefs:
+    - name: medimesh-complaint-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5008
+  # Forum (/forum)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /forum
+    backendRefs:
+    - name: medimesh-forum-svc
+      namespace: {{ .Values.global.namespaces.backend }}
+      port: 5009
+  # Frontend catch-all (MUST be last)
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: {{ .Values.service.name }}
+      namespace: {{ .Values.global.namespaces.frontend }}
+      port: {{ .Values.service.port }}
+{{- end }}

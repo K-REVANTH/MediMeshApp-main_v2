@@ -1,0 +1,134 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — kGateway (Gateway + HTTPRoute)
+# ════════════════════════════════════════════════════════════
+# Gateway API-based routing for all MediMesh microservices.
+# kGateway controller must be installed before applying this.
+# ════════════════════════════════════════════════════════════
+
+# ─── Gateway ─────────────────────────────────────────────
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: medimesh-gateway
+  namespace: medimesh
+spec:
+  gatewayClassName: kgateway
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: Same
+
+---
+# ─── HTTPRoute — All Microservice Routes ─────────────────
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: medimesh-routes
+  namespace: medimesh
+spec:
+  parentRefs:
+  - name: medimesh-gateway
+
+  rules:
+  # ─── BFF Gateway (/api) ──────────────────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api
+    backendRefs:
+    - name: medimesh-bff-svc
+      port: 5010
+
+  # ─── Auth Service (/auth) ────────────────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /auth
+    backendRefs:
+    - name: medimesh-auth-svc
+      port: 5001
+
+  # ─── User Service (/user) ────────────────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /user
+    backendRefs:
+    - name: medimesh-user-svc
+      port: 5002
+
+  # ─── Doctor Service (/doctor) ────────────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /doctor
+    backendRefs:
+    - name: medimesh-doctor-svc
+      port: 5003
+
+  # ─── Appointment Service (/appointment) ──────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /appointment
+    backendRefs:
+    - name: medimesh-appointment-svc
+      port: 5004
+
+  # ─── Vitals Service (/vitals) ────────────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /vitals
+    backendRefs:
+    - name: medimesh-vitals-svc
+      port: 5005
+
+  # ─── Pharmacy Service (/pharmacy) ────────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /pharmacy
+    backendRefs:
+    - name: medimesh-pharmacy-svc
+      port: 5006
+
+  # ─── Ambulance Service (/ambulance) ──────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /ambulance
+    backendRefs:
+    - name: medimesh-ambulance-svc
+      port: 5007
+
+  # ─── Complaint Service (/complaint) ──────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /complaint
+    backendRefs:
+    - name: medimesh-complaint-svc
+      port: 5008
+
+  # ─── Forum Service (/forum) ──────────────────────────────
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /forum
+    backendRefs:
+    - name: medimesh-forum-svc
+      port: 5009
+
+  # ─── Frontend (catch-all /) ──────────────────────────────
+  # MUST be LAST so specific paths above match first
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: medimesh-frontend-svc
+      port: 80

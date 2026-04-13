@@ -1,0 +1,23 @@
+# Shared ConfigMap — cross-namespace service URLs
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: medimesh-config
+  namespace: {{ .Values.global.namespaces.backend }}
+  labels:
+    {{- include "medimesh.labels" . | nindent 4 }}
+data:
+  NODE_ENV: {{ .Values.global.environment | quote }}
+  MONGO_HOST: {{ .Values.global.mongo.host | quote }}
+  MONGO_PORT: {{ .Values.global.mongo.port | quote }}
+  {{- $ns := .Values.global.namespaces.backend }}
+  AUTH_SERVICE_URL: "http://medimesh-auth-svc.{{ $ns }}.svc.cluster.local:5001"
+  USER_SERVICE_URL: "http://medimesh-user-svc.{{ $ns }}.svc.cluster.local:5002"
+  DOCTOR_SERVICE_URL: "http://medimesh-doctor-svc.{{ $ns }}.svc.cluster.local:5003"
+  APPOINTMENT_SERVICE_URL: "http://medimesh-appointment-svc.{{ $ns }}.svc.cluster.local:5004"
+  VITALS_SERVICE_URL: "http://medimesh-vitals-svc.{{ $ns }}.svc.cluster.local:5005"
+  PHARMACY_SERVICE_URL: "http://medimesh-pharmacy-svc.{{ $ns }}.svc.cluster.local:5006"
+  AMBULANCE_SERVICE_URL: "http://medimesh-ambulance-svc.{{ $ns }}.svc.cluster.local:5007"
+  COMPLAINT_SERVICE_URL: "http://medimesh-complaint-svc.{{ $ns }}.svc.cluster.local:5008"
+  FORUM_SERVICE_URL: "http://medimesh-forum-svc.{{ $ns }}.svc.cluster.local:5009"
+  BFF_SERVICE_URL: "http://medimesh-bff-svc.{{ $ns }}.svc.cluster.local:5010"

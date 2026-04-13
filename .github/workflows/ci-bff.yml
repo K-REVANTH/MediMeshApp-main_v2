@@ -1,0 +1,33 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — BFF Service CI Pipeline
+# ═══════════════════════════════════════════════════════════════
+# Triggers only on changes to medimesh-bff/
+# Calls the reusable pipeline template via workflow_call.
+# ═══════════════════════════════════════════════════════════════
+
+name: "CI — BFF Service"
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+    paths:
+      - 'medimesh-bff/**'
+      - '.github/workflows/ci-bff.yml'
+      - '.github/workflows/_reusable-service-pipeline.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'medimesh-bff/**'
+
+concurrency:
+  group: ci-bff-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_reusable-service-pipeline.yml
+    with:
+      service-path: medimesh-bff
+      service-name: medimesh-bff
+      image-name: medimesh_medimesh-bff
+    secrets: inherit

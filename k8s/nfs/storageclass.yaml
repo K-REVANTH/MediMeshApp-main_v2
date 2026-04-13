@@ -1,0 +1,28 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — NFS StorageClass (Dynamic Provisioning)
+# ════════════════════════════════════════════════════════════
+# This StorageClass enables dynamic PV provisioning via NFS.
+# When a PVC is created with this class, the provisioner
+# automatically creates a subdirectory on the NFS server
+# and creates a PV bound to it.
+# ════════════════════════════════════════════════════════════
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-dynamic
+  labels:
+    app: medimesh
+    tier: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: medimesh/nfs-subdir-external-provisioner
+parameters:
+  # When PVC is deleted, archive the data instead of deleting
+  # Set to "delete" if you want automatic cleanup
+  onDelete: retain
+  # Path pattern for subdirectories on NFS
+  # Creates: /srv/nfs/medimesh/${namespace}-${pvcName}-${pvName}
+  pathPattern: "${.PVC.namespace}-${.PVC.name}"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true

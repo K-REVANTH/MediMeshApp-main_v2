@@ -1,0 +1,212 @@
+# ═══════════════════════════════════════════════════════════════
+# MediMesh — Security Gate (Post-Build Orchestrator)
+# ═══════════════════════════════════════════════════════════════
+# Triggered via workflow_run after ANY service CI pipeline completes.
+# Runs SonarQube SAST + Trivy image scanning as MANDATORY gates.
+#
+# This workflow CANNOT be skipped or bypassed:
+#   - Missing SONAR_TOKEN → pipeline FAILS with clear error
+#   - Missing DOCKERHUB_TOKEN → pipeline FAILS with clear error
+#   - Trivy exit-code: 1 → CRITICAL/HIGH vulns FAIL the pipeline
+# ═══════════════════════════════════════════════════════════════
+
+name: "🔒 Security Gate"
+
+on:
+  workflow_run:
+    workflows:
+      - "CI — Auth Service"
+      - "CI — User Service"
+      - "CI — Doctor Service"
+      - "CI — Appointment Service"
+      - "CI — Vitals Service"
+      - "CI — Pharmacy Service"
+      - "CI — Ambulance Service"
+      - "CI — Complaint Service"
+      - "CI — Forum Service"
+      - "CI — BFF Service"
+      - "CI — Frontend Service"
+    types: [completed]
+
+concurrency:
+  group: security-gate-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false  # Never cancel security scans
+
+jobs:
+  # ══════════════════════════════════════════════════════════
+  # Gate Check: Only run if the triggering pipeline PASSED
+  # ══════════════════════════════════════════════════════════
+  gate-check:
+    name: "✅ Verify Trigger Status"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      should-run: ${{ steps.verify.outputs.should-run }}
+    steps:
+      - name: ✅ Triggering workflow succeeded
+        id: verify
+        run: |
+          echo "should-run=true" >> $GITHUB_OUTPUT
+          echo "═══════════════════════════════════════════════════"
+          echo "  Security Gate triggered by: ${{ github.event.workflow_run.name }}"
+          echo "  Commit:  ${{ github.event.workflow_run.head_sha }}"
+          echo "  Branch:  ${{ github.event.workflow_run.head_branch }}"
+          echo "  Status:  ${{ github.event.workflow_run.conclusion }}"
+          echo "═══════════════════════════════════════════════════"
+
+  # ══════════════════════════════════════════════════════════
+  # SonarQube SAST — Static Application Security Testing
+  # ══════════════════════════════════════════════════════════
+  sonarqube:
+    name: "🔬 SonarQube SAST Analysis"
+    needs: [gate-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code (full history for SonarQube)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: 🔐 Validate SonarQube Configuration
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          MISSING=""
+          if [ -z "${SONAR_TOKEN}" ]; then
+            MISSING="${MISSING}\n  ❌ SONAR_TOKEN is missing"
+          fi
+          if [ -z "${SONAR_HOST_URL}" ]; then
+            MISSING="${MISSING}\n  ❌ SONAR_HOST_URL is missing"
+          fi
+          if [ -n "${MISSING}" ]; then
+            echo "══════════════════════════════════════════════════════════"
+            echo "❌ FATAL: SonarQube secrets not configured!"
+            echo -e "${MISSING}"
+            echo ""
+            echo "  SonarQube analysis CANNOT be skipped."
+            echo "  Configure at: GitHub → Settings → Secrets → Actions"
+            echo "══════════════════════════════════════════════════════════"
+            exit 1
+          fi
+          echo "✅ SonarQube secrets are configured."
+
+      - name: 📥 Download Coverage Reports from CI Pipeline
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          merge-multiple: false
+        continue-on-error: true  # Some services may not have coverage
+
+      - name: 📋 List Available Coverage
+        run: |
+          echo "📊 Available coverage reports:"
+          find . -name "lcov.info" -type f 2>/dev/null || echo "  (none found)"
+
+      - name: 🔬 SonarQube Scan (Enforced)
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          projectBaseDir: .
+
+  # ══════════════════════════════════════════════════════════
+  # Trivy — Container Image Vulnerability Scanning
+  # ══════════════════════════════════════════════════════════
+  trivy:
+    name: "🔒 Trivy Image Scan"
+    needs: [gate-check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Download Build Metadata
+        uses: actions/download-artifact@v4
+        with:
+          pattern: build-meta-*
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          merge-multiple: true
+
+      - name: 📋 Extract Image Reference
+        id: meta
+        run: |
+          if [ ! -f image-ref.txt ]; then
+            echo "❌ No build metadata found. The triggering pipeline may not have built an image."
+            exit 1
+          fi
+          IMAGE_REF=$(cat image-ref.txt)
+          SERVICE_NAME=$(cat service-name.txt)
+          echo "image-ref=${IMAGE_REF}" >> $GITHUB_OUTPUT
+          echo "service-name=${SERVICE_NAME}" >> $GITHUB_OUTPUT
+          echo "══════════════════════════════════════════════════"
+          echo "  📦 Image to scan: ${IMAGE_REF}"
+          echo "  📌 Service:       ${SERVICE_NAME}"
+          echo "══════════════════════════════════════════════════"
+
+      - name: 🔐 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🔒 Run Trivy Vulnerability Scanner (Enforced)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta.outputs.image-ref }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          output: 'trivy-${{ steps.meta.outputs.service-name }}.txt'
+        # ❌ exit-code: 1 — CRITICAL/HIGH vulnerabilities FAIL the pipeline
+
+      - name: 📊 Upload Trivy Scan Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report-${{ steps.meta.outputs.service-name }}
+          path: 'trivy-${{ steps.meta.outputs.service-name }}.txt'
+          retention-days: 14
+
+  # ══════════════════════════════════════════════════════════
+  # Security Summary
+  # ══════════════════════════════════════════════════════════
+  security-summary:
+    name: "📋 Security Gate Summary"
+    needs: [sonarqube, trivy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📋 Security Gate Results
+        run: |
+          echo "═══════════════════════════════════════════════════"
+          echo "  MediMesh Security Gate — Final Report"
+          echo "═══════════════════════════════════════════════════"
+          echo "  Triggered by: ${{ github.event.workflow_run.name }}"
+          echo "  Commit:       ${{ github.event.workflow_run.head_sha }}"
+          echo "  Branch:       ${{ github.event.workflow_run.head_branch }}"
+          echo "═══════════════════════════════════════════════════"
+          echo ""
+          echo "  Stage Results:"
+          echo "    SonarQube SAST:  ${{ needs.sonarqube.result }}"
+          echo "    Trivy Scan:      ${{ needs.trivy.result }}"
+          echo "═══════════════════════════════════════════════════"
+
+      - name: ❌ Fail if any security check failed
+        if: |
+          needs.sonarqube.result == 'failure' ||
+          needs.trivy.result == 'failure'
+        run: |
+          echo "══════════════════════════════════════════════════════════"
+          echo "❌ SECURITY GATE FAILED"
+          echo ""
+          echo "  One or more security checks did not pass."
+          echo "  Fix all vulnerabilities before merging to main."
+          echo "══════════════════════════════════════════════════════════"
+          exit 1

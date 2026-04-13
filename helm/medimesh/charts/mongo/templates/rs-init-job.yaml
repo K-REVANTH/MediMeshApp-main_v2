@@ -1,0 +1,109 @@
+# MongoDB ReplicaSet Initialization Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.rsInitJob.name }}
+  namespace: {{ .Values.global.namespaces.db }}
+  labels:
+    app: {{ .Values.name }}
+    tier: database
+    component: rs-init
+spec:
+  backoffLimit: {{ .Values.rsInitJob.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.rsInitJob.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+        tier: database
+        component: rs-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mongo-rs-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              echo "═══════════════════════════════════════════════"
+              echo "  MediMesh — MongoDB ReplicaSet Initialization"
+              echo "═══════════════════════════════════════════════"
+
+              {{- $dbNs := .Values.global.namespaces.db }}
+              {{- $mongo := .Values }}
+
+              MEMBERS=(
+              {{- range $i := until (int $mongo.replicas) }}
+                "{{ $mongo.name }}-{{ $i }}.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local"
+              {{- end }}
+              )
+
+              echo "Waiting for all MongoDB pods..."
+              for host in "${MEMBERS[@]}"; do
+                echo -n "  Checking $host..."
+                RETRY=0
+                until mongosh --host "$host" --port {{ $mongo.containerPort }} --quiet --eval "db.adminCommand('ping')" &>/dev/null; do
+                  RETRY=$((RETRY + 1))
+                  if [ $RETRY -ge 60 ]; then echo " FAILED!"; exit 1; fi
+                  echo -n "."
+                  sleep 3
+                done
+                echo " Ready"
+              done
+
+              echo "Checking if ReplicaSet already initialized..."
+              ALREADY=$(mongosh --host "{{ $mongo.name }}-0.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local" --port {{ $mongo.containerPort }} --quiet --eval "
+                try { var s = rs.status(); if (s.ok === 1) { print('YES'); } else { print('NO'); } } catch(e) { print('NO'); }
+              " 2>/dev/null || echo "NO")
+
+              if echo "$ALREADY" | grep -q "YES"; then
+                echo "  ReplicaSet already initialized!"
+                mongosh --host "{{ $mongo.name }}-0.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local" --port {{ $mongo.containerPort }} --quiet --eval "
+                  var s = rs.status(); s.members.forEach(function(m) { print('  ' + m.name + ' → ' + m.stateStr); });
+                "
+                exit 0
+              fi
+
+              echo "Initializing ReplicaSet {{ $mongo.replicaSetName }}..."
+              mongosh --host "{{ $mongo.name }}-0.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local" --port {{ $mongo.containerPort }} --eval "
+                rs.initiate({
+                  _id: '{{ $mongo.replicaSetName }}',
+                  members: [
+                    { _id: 0, host: '{{ $mongo.name }}-0.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local:{{ $mongo.containerPort }}', priority: 2 },
+                    { _id: 1, host: '{{ $mongo.name }}-1.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local:{{ $mongo.containerPort }}', priority: 1 },
+                    { _id: 2, host: '{{ $mongo.name }}-2.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local:{{ $mongo.containerPort }}', priority: 1 }
+                  ]
+                });
+              "
+
+              echo "Waiting for PRIMARY election..."
+              RETRY=0
+              until mongosh --host "{{ $mongo.name }}-0.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local" --port {{ $mongo.containerPort }} --quiet --eval "
+                var s = rs.status(); var p = s.members.filter(function(m) { return m.stateStr === 'PRIMARY'; });
+                if (p.length === 1) { print('PRIMARY_ELECTED'); } else { quit(1); }
+              " 2>/dev/null | grep -q "PRIMARY_ELECTED"; do
+                RETRY=$((RETRY + 1))
+                if [ $RETRY -ge 40 ]; then echo "  PRIMARY election timed out!"; exit 1; fi
+                echo "  Waiting... ($RETRY/40)"
+                sleep 3
+              done
+              echo "  PRIMARY elected!"
+
+              echo "Final ReplicaSet Status:"
+              mongosh --host "{{ $mongo.name }}-0.{{ $mongo.name }}.{{ $dbNs }}.svc.cluster.local" --port {{ $mongo.containerPort }} --quiet --eval "
+                var s = rs.status(); print('Set: ' + s.set);
+                s.members.forEach(function(m) { print('  [' + m._id + '] ' + m.name + ' → ' + m.stateStr); });
+              "
+              echo "═══════════════════════════════════════════════"
+              echo "  MongoDB ReplicaSet initialized successfully!"
+              echo "═══════════════════════════════════════════════"
+          resources:
+            requests:
+              cpu: {{ .Values.rsInitJob.resources.requests.cpu | quote }}
+              memory: {{ .Values.rsInitJob.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.rsInitJob.resources.limits.cpu | quote }}
+              memory: {{ .Values.rsInitJob.resources.limits.memory | quote }}

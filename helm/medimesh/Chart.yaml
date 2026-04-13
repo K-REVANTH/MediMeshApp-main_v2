@@ -1,0 +1,57 @@
+apiVersion: v2
+name: medimesh
+description: MediMesh — Umbrella Helm Chart for Hospital Management Microservices
+type: application
+version: 2.0.0
+appVersion: "v2.0.0"
+keywords:
+  - medimesh
+  - hospital
+  - microservices
+  - kubernetes
+  - helm-umbrella
+maintainers:
+  - name: Bharath
+home: https://github.com/bharath44623/MediMesh
+
+dependencies:
+  - name: frontend
+    version: 1.0.0
+    repository: "file://charts/frontend"
+  - name: bff
+    version: 1.0.0
+    repository: "file://charts/bff"
+  - name: auth
+    version: 1.0.0
+    repository: "file://charts/auth"
+  - name: user
+    version: 1.0.0
+    repository: "file://charts/user"
+  - name: doctor
+    version: 1.0.0
+    repository: "file://charts/doctor"
+  - name: appointment
+    version: 1.0.0
+    repository: "file://charts/appointment"
+  - name: vitals
+    version: 1.0.0
+    repository: "file://charts/vitals"
+  - name: pharmacy
+    version: 1.0.0
+    repository: "file://charts/pharmacy"
+  - name: ambulance
+    version: 1.0.0
+    repository: "file://charts/ambulance"
+  - name: complaint
+    version: 1.0.0
+    repository: "file://charts/complaint"
+  - name: forum
+    version: 1.0.0
+    repository: "file://charts/forum"
+  - name: mongo
+    version: 1.0.0
+    repository: "file://charts/mongo"
+  - name: nfs
+    version: 1.0.0
+    repository: "file://charts/nfs"
+    condition: nfs.enabled

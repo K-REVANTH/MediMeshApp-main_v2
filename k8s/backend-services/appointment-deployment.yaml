@@ -1,0 +1,86 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — Appointment Service Deployment
+# ════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medimesh-appointment
+  namespace: medimesh
+  labels:
+    app: medimesh-appointment
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: medimesh-appointment
+      tier: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: medimesh-appointment
+        tier: backend
+    spec:
+      # ─── Wait for MongoDB ReplicaSet PRIMARY ──────────────
+      initContainers:
+        - name: wait-for-mongodb-primary
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MongoDB ReplicaSet to be ready..."
+              until nc -z medimesh-mongodb-0.medimesh-mongodb 27017; do
+                echo "medimesh-mongodb-0 not ready, retrying in 3s..."
+                sleep 3
+              done
+              echo "MongoDB ReplicaSet is reachable!"
+      containers:
+        - name: medimesh-appointment
+          image: bharath44623/medimesh_medimesh-appointment:v1.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5004
+              name: http
+          env:
+            - name: PORT
+              value: "5004"
+            - name: MONGO_URI
+              value: "mongodb://medimesh-mongodb-0.medimesh-mongodb:27017,medimesh-mongodb-1.medimesh-mongodb:27017,medimesh-mongodb-2.medimesh-mongodb:27017/medimesh-appointment-db?replicaSet=rs0"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: medimesh-secrets
+                  key: JWT_SECRET
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: medimesh-config
+                  key: NODE_ENV
+          # ─── Health Probes ──────────────────────────────────
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5004
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5004
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

@@ -1,0 +1,77 @@
+# Vitals Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.global.namespaces.backend }}
+  labels:
+    app: {{ .Values.name }}
+    tier: backend
+    app.kubernetes.io/part-of: medimesh
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+      tier: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+        tier: backend
+    spec:
+      initContainers:
+        - name: wait-for-mongodb
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z {{ .Values.global.mongo.host }}-0.{{ .Values.global.mongo.host }}.{{ .Values.global.namespaces.db }}.svc.cluster.local {{ .Values.global.mongo.port }}; do echo 'Waiting for MongoDB...'; sleep 3; done"]
+      containers:
+        - name: {{ .Values.name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+              name: http
+          env:
+            - name: PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: MONGO_URI
+              value: "mongodb://{{ .Values.global.mongo.host }}-0.{{ .Values.global.mongo.host }}.{{ .Values.global.namespaces.db }}.svc.cluster.local:{{ .Values.global.mongo.port }},{{ .Values.global.mongo.host }}-1.{{ .Values.global.mongo.host }}.{{ .Values.global.namespaces.db }}.svc.cluster.local:{{ .Values.global.mongo.port }},{{ .Values.global.mongo.host }}-2.{{ .Values.global.mongo.host }}.{{ .Values.global.namespaces.db }}.svc.cluster.local:{{ .Values.global.mongo.port }}/{{ .Values.dbName }}?replicaSet={{ .Values.global.mongo.replicaSet }}"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: medimesh-secrets
+                  key: JWT_SECRET
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: medimesh-config
+                  key: NODE_ENV
+            {{- if .Values.extraEnv }}
+            {{- toYaml .Values.extraEnv | nindent 12 }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.containerPort }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              memory: {{ .Values.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              memory: {{ .Values.resources.limits.memory | quote }}

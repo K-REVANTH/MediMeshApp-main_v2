@@ -1,0 +1,35 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — Horizontal Pod Autoscaler (Frontend)
+# ════════════════════════════════════════════════════════════
+#
+# Prerequisites:
+#   Metrics Server must be installed on the cluster:
+#   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+#
+# For kubeadm clusters, you may need to add this flag to
+# metrics-server deployment:
+#   --kubelet-insecure-tls
+#
+# ════════════════════════════════════════════════════════════
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: medimesh-frontend-hpa
+  namespace: medimesh
+  labels:
+    app: medimesh-frontend
+    tier: frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: medimesh-frontend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60

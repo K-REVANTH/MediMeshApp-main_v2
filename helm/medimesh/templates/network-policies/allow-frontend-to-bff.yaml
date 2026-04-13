@@ -1,0 +1,39 @@
+# Allow: Frontend → BFF (frontend can reach BFF in backend namespace)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-bff
+  namespace: {{ .Values.global.namespaces.backend }}
+  labels:
+    {{- include "medimesh.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: medimesh-bff
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              medimesh/tier: frontend
+---
+# Allow: Frontend egress to backend namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-egress-to-backend
+  namespace: {{ .Values.global.namespaces.frontend }}
+  labels:
+    {{- include "medimesh.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      tier: frontend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              medimesh/tier: backend

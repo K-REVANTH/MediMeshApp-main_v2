@@ -1,0 +1,50 @@
+# NFS Subdir External Provisioner Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.provisioner.name }}
+  namespace: {{ .Values.global.namespaces.db }}
+  labels:
+    app: {{ .Values.provisioner.name }}
+    tier: storage
+    app.kubernetes.io/part-of: medimesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.provisioner.name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.provisioner.name }}
+        tier: storage
+    spec:
+      serviceAccountName: {{ .Values.provisioner.name }}
+      containers:
+        - name: {{ .Values.provisioner.name }}
+          image: "{{ .Values.provisioner.image.repository }}:{{ .Values.provisioner.image.tag }}"
+          imagePullPolicy: {{ .Values.provisioner.image.pullPolicy }}
+          env:
+            - name: PROVISIONER_NAME
+              value: {{ .Values.provisioner.provisionerName | quote }}
+            - name: NFS_SERVER
+              value: {{ .Values.global.storage.nfs.server | quote }}
+            - name: NFS_PATH
+              value: {{ .Values.global.storage.nfs.path | quote }}
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          resources:
+            requests:
+              cpu: {{ .Values.provisioner.resources.requests.cpu | quote }}
+              memory: {{ .Values.provisioner.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.provisioner.resources.limits.cpu | quote }}
+              memory: {{ .Values.provisioner.resources.limits.memory | quote }}
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: {{ .Values.global.storage.nfs.server | quote }}
+            path: {{ .Values.global.storage.nfs.path | quote }}

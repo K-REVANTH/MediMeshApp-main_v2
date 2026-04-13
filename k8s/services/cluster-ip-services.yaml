@@ -1,0 +1,217 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — All ClusterIP Services (Internal Communication)
+# ════════════════════════════════════════════════════════════
+# These services enable internal DNS-based communication
+# between microservices within the medimesh namespace.
+# Frontend NodePort service is in frontend/frontend-deployment.yaml
+# MongoDB headless service is in mongodb/mongodb-statefulset.yaml
+# ════════════════════════════════════════════════════════════
+
+# ─── Auth Service (ClusterIP) ────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-auth-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-auth
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-auth
+    tier: backend
+  ports:
+    - port: 5001
+      targetPort: 5001
+      protocol: TCP
+      name: http
+
+---
+# ─── User Service (ClusterIP) ────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-user-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-user
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-user
+    tier: backend
+  ports:
+    - port: 5002
+      targetPort: 5002
+      protocol: TCP
+      name: http
+
+---
+# ─── Doctor Service (ClusterIP) ──────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-doctor-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-doctor
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-doctor
+    tier: backend
+  ports:
+    - port: 5003
+      targetPort: 5003
+      protocol: TCP
+      name: http
+
+---
+# ─── Appointment Service (ClusterIP) ─────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-appointment-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-appointment
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-appointment
+    tier: backend
+  ports:
+    - port: 5004
+      targetPort: 5004
+      protocol: TCP
+      name: http
+
+---
+# ─── Vitals Service (ClusterIP) ──────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-vitals-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-vitals
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-vitals
+    tier: backend
+  ports:
+    - port: 5005
+      targetPort: 5005
+      protocol: TCP
+      name: http
+
+---
+# ─── Pharmacy Service (ClusterIP) ────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-pharmacy-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-pharmacy
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-pharmacy
+    tier: backend
+  ports:
+    - port: 5006
+      targetPort: 5006
+      protocol: TCP
+      name: http
+
+---
+# ─── Ambulance Service (ClusterIP) ───────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-ambulance-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-ambulance
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-ambulance
+    tier: backend
+  ports:
+    - port: 5007
+      targetPort: 5007
+      protocol: TCP
+      name: http
+
+---
+# ─── Complaint Service (ClusterIP) ───────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-complaint-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-complaint
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-complaint
+    tier: backend
+  ports:
+    - port: 5008
+      targetPort: 5008
+      protocol: TCP
+      name: http
+
+---
+# ─── Forum Service (ClusterIP) ───────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-forum-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-forum
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-forum
+    tier: backend
+  ports:
+    - port: 5009
+      targetPort: 5009
+      protocol: TCP
+      name: http
+
+---
+# ─── BFF Service (ClusterIP) ─────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-bff-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-bff
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-bff
+    tier: backend
+  ports:
+    - port: 5010
+      targetPort: 5010
+      protocol: TCP
+      name: http

@@ -1,0 +1,115 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — Frontend Deployment + ClusterIP Service
+# ════════════════════════════════════════════════════════════
+
+# ─── Deployment ───────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medimesh-frontend
+  namespace: medimesh
+  labels:
+    app: medimesh-frontend
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: medimesh-frontend
+      tier: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: medimesh-frontend
+        tier: frontend
+    spec:
+      containers:
+        # ─── Main Frontend Container ────────────────────────────
+        - name: medimesh-frontend
+          image: bharath44623/medimesh_medimesh-frontend:v1.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: BFF_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: medimesh-config
+                  key: BFF_SERVICE_URL
+          # ─── Health Probes ──────────────────────────────────
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: nginx-logs
+              mountPath: /var/log/nginx
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+        # ─── Sidecar: Log Aggregator ──────────────────────────
+        - name: log-sidecar
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Starting nginx log sidecar..."
+              tail -F /var/log/nginx/access.log 2>/dev/null &
+              tail -F /var/log/nginx/error.log 2>/dev/null &
+              wait
+          volumeMounts:
+            - name: nginx-logs
+              mountPath: /var/log/nginx
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "32Mi"
+            limits:
+              cpu: "50m"
+              memory: "64Mi"
+      volumes:
+        - name: nginx-logs
+          emptyDir: {}
+
+---
+# ─── ClusterIP Service (Internal — routed via kGateway) ────
+apiVersion: v1
+kind: Service
+metadata:
+  name: medimesh-frontend-svc
+  namespace: medimesh
+  labels:
+    app: medimesh-frontend
+    tier: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: medimesh-frontend
+    tier: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+

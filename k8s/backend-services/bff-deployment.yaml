@@ -1,0 +1,73 @@
+# ════════════════════════════════════════════════════════════
+# MediMesh — BFF (Backend-For-Frontend) Service Deployment
+# ════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medimesh-bff
+  namespace: medimesh
+  labels:
+    app: medimesh-bff
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: medimesh-bff
+      tier: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: medimesh-bff
+        tier: backend
+    spec:
+      containers:
+        - name: medimesh-bff
+          image: bharath44623/medimesh_medimesh-bff:v1.1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5010
+              name: http
+          env:
+            - name: PORT
+              value: "5010"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: medimesh-secrets
+                  key: JWT_SECRET
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: medimesh-config
+                  key: NODE_ENV
+          envFrom:
+            - configMapRef:
+                name: medimesh-config
+          # ─── Health Probes ──────────────────────────────────
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5010
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5010
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
