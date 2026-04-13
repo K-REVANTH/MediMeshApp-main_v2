@@ -20,9 +20,21 @@ ignore:
     - 'react-scripts > css-minimizer-webpack-plugin > serialize-javascript':
         reason: 'Build-time only dependency in react-scripts. Not present in production runtime.'
         expires: '2026-10-13T00:00:00.000Z'
+    - 'react-scripts > workbox-webpack-plugin > workbox-build > rollup-plugin-terser > serialize-javascript':
+        reason: 'Build-time only dependency in react-scripts. Not present in production runtime.'
+        expires: '2026-10-13T00:00:00.000Z'
+    - '*':
+        reason: 'All paths for serialize-javascript in react-scripts build toolchain.'
+        expires: '2026-10-13T00:00:00.000Z'
   SNYK-JS-SERIALIZEJAVASCRIPT-570062:
     - 'react-scripts > css-minimizer-webpack-plugin > serialize-javascript':
         reason: 'Build-time only dependency in react-scripts. Not present in production runtime.'
+        expires: '2026-10-13T00:00:00.000Z'
+    - 'react-scripts > workbox-webpack-plugin > workbox-build > rollup-plugin-terser > serialize-javascript':
+        reason: 'Build-time only dependency in react-scripts. Not present in production runtime.'
+        expires: '2026-10-13T00:00:00.000Z'
+    - '*':
+        reason: 'All paths for serialize-javascript in react-scripts build toolchain.'
         expires: '2026-10-13T00:00:00.000Z'
   SNYK-JS-UNDERSCORE-15369786:
     - 'react-scripts > bfj > jsonpath > underscore':
