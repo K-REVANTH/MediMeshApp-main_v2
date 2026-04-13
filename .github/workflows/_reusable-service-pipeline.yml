@@ -81,9 +81,13 @@ jobs:
             npm install --no-audit
           fi
 
+      - name: 📦 Install ESLint v8 (compatible with .eslintrc.json)
+        working-directory: ${{ inputs.service-path }}
+        run: npm install --no-save eslint@8
+
       - name: 🔍 Run ESLint (Strict — failures block the pipeline)
         working-directory: ${{ inputs.service-path }}
-        run: npx eslint . --ext .js,.jsx --format stylish --no-error-on-unmatched-pattern
+        run: npx eslint . --ext .js,.jsx -c ${{ github.workspace }}/.eslintrc.json --format stylish --no-error-on-unmatched-pattern
         # ❌ No "|| true" — lint errors FAIL the build
 
   # ══════════════════════════════════════════════════════════
