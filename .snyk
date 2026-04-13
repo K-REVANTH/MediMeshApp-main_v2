@@ -1,0 +1,34 @@
+# Snyk (https://snyk.io) policy file
+# This file documents known, reviewed vulnerabilities that are accepted risks.
+#
+# All vulnerabilities below are transitive dependencies of react-scripts@5.0.1
+# (a BUILD-TIME tool). They do NOT affect the production runtime because:
+#   - react-scripts is only used during `npm run build`
+#   - The production image runs nginx serving static HTML/JS/CSS
+#   - None of these packages are shipped to end users
+#
+# These will be resolved when react-scripts is upgraded to v6+
+# Review date: 2026-04-13
+
+version: v1.25.0
+ignore:
+  SNYK-JS-NTHCHECK-1586032:
+    - 'react-scripts > @svgr/webpack > @svgr/plugin-svgo > svgo > css-select > nth-check':
+        reason: 'Build-time only dependency in react-scripts. Not present in production runtime.'
+        expires: '2026-10-13T00:00:00.000Z'
+  SNYK-JS-SERIALIZEJAVASCRIPT-15809196:
+    - 'react-scripts > css-minimizer-webpack-plugin > serialize-javascript':
+        reason: 'Build-time only dependency in react-scripts. Not present in production runtime.'
+        expires: '2026-10-13T00:00:00.000Z'
+  SNYK-JS-SERIALIZEJAVASCRIPT-570062:
+    - 'react-scripts > css-minimizer-webpack-plugin > serialize-javascript':
+        reason: 'Build-time only dependency in react-scripts. Not present in production runtime.'
+        expires: '2026-10-13T00:00:00.000Z'
+  SNYK-JS-UNDERSCORE-15369786:
+    - 'react-scripts > bfj > jsonpath > underscore':
+        reason: 'Build-time only dependency in react-scripts. Not present in production runtime.'
+        expires: '2026-10-13T00:00:00.000Z'
+  SNYK-JS-WEBPACKDEVSERVER-10300775:
+    - 'react-scripts > webpack-dev-server':
+        reason: 'Development-only dependency. webpack-dev-server is never used in production.'
+        expires: '2026-10-13T00:00:00.000Z'

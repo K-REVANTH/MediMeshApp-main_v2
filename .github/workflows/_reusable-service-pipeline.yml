@@ -170,7 +170,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: --severity-threshold=high --file=${{ inputs.service-path }}/package.json
+          args: --severity-threshold=high --file=${{ inputs.service-path }}/package.json --policy-path=$GITHUB_WORKSPACE/.snyk
 
   # ══════════════════════════════════════════════════════════
   # STAGE 3: Docker Build & Push
