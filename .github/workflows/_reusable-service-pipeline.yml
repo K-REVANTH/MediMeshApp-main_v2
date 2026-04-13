@@ -4,12 +4,16 @@
 # Single reusable template for ALL microservices.
 # Called by each ci-<service>.yml via workflow_call.
 #
-# Pipeline: Lint → Test + Snyk (parallel) → Docker Build & Push
+# Pipeline Order:
+#   Stage 1: Lint (must pass)
+#   Stage 2: Test + Snyk (run in parallel, both must pass)
+#   Stage 3: Docker Build & Push (only after Stage 2 passes)
 #
 # Security enforcement:
 #   - ESLint: strict (no || true)
-#   - Snyk: enforced (no continue-on-error)
-#   - Missing secrets = instant failure
+#   - Snyk: enforced when SNYK_TOKEN is set, fails with clear
+#           error message when not set
+#   - Missing Docker secrets = build stage fails
 # ═══════════════════════════════════════════════════════════════
 
 name: Reusable Service CI Pipeline
@@ -46,11 +50,11 @@ on:
         description: 'Docker Hub username'
     secrets:
       SNYK_TOKEN:
-        required: true
+        required: false
       DOCKERHUB_USERNAME:
-        required: true
+        required: false
       DOCKERHUB_TOKEN:
-        required: true
+        required: false
 
 jobs:
   # ══════════════════════════════════════════════════════════
@@ -67,28 +71,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: ${{ inputs.service-path }}/package.json
 
       - name: 📦 Install Dependencies
         working-directory: ${{ inputs.service-path }}
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            echo "⚠️ No package-lock.json found — using npm install."
-            echo "   Recommendation: Run 'npm install' locally and commit package-lock.json"
-            npm install --no-audit
-          fi
+        run: npm install --no-audit --no-fund
 
       - name: 📦 Install ESLint v8 (compatible with .eslintrc.json)
-        working-directory: ${{ inputs.service-path }}
         run: npm install --no-save eslint@8
-
-      - name: 🔍 Run ESLint (Strict — failures block the pipeline)
         working-directory: ${{ inputs.service-path }}
-        run: npx eslint . --ext .js,.jsx -c ${{ github.workspace }}/.eslintrc.json --format stylish --no-error-on-unmatched-pattern
-        # ❌ No "|| true" — lint errors FAIL the build
+
+      - name: 🔍 Run ESLint (Strict)
+        run: |
+          cd ${{ inputs.service-path }}
+          npx eslint . \
+            --ext .js,.jsx \
+            --config "$GITHUB_WORKSPACE/.eslintrc.json" \
+            --resolve-plugins-relative-to "$GITHUB_WORKSPACE" \
+            --format stylish \
+            --no-error-on-unmatched-pattern
 
   # ══════════════════════════════════════════════════════════
   # STAGE 2a: Unit Tests & Coverage
@@ -105,17 +105,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: ${{ inputs.service-path }}/package.json
 
       - name: 📦 Install Dependencies
         working-directory: ${{ inputs.service-path }}
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --no-audit
-          fi
+        run: npm install --no-audit --no-fund
 
       - name: 🧪 Run Unit Tests with Coverage
         working-directory: ${{ inputs.service-path }}
@@ -132,6 +125,7 @@ jobs:
           name: coverage-${{ inputs.service-name }}
           path: ${{ inputs.service-path }}/coverage/
           retention-days: 7
+          if-no-files-found: ignore
 
   # ══════════════════════════════════════════════════════════
   # STAGE 2b: Snyk SCA (runs parallel to tests)
@@ -151,23 +145,20 @@ jobs:
 
       - name: 📦 Install Dependencies
         working-directory: ${{ inputs.service-path }}
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --no-audit
-          fi
+        run: npm install --no-audit --no-fund
 
       - name: 🔐 Validate Snyk Token
+        id: snyk-check
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           if [ -z "${SNYK_TOKEN}" ]; then
             echo "══════════════════════════════════════════════════════════"
-            echo "❌ FATAL: SNYK_TOKEN secret is not configured!"
+            echo "❌ SNYK_TOKEN secret is not configured!"
             echo ""
-            echo "  Security scanning CANNOT be skipped."
-            echo "  Configure it at:"
+            echo "  Security scanning requires a valid SNYK_TOKEN."
+            echo "  Get one at: https://app.snyk.io/account"
+            echo "  Then add it at:"
             echo "  GitHub → Repository → Settings → Secrets → Actions"
             echo "══════════════════════════════════════════════════════════"
             exit 1
@@ -180,7 +171,6 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           args: --severity-threshold=high --file=${{ inputs.service-path }}/package.json
-        # ❌ No continue-on-error — high/critical vulns FAIL the build
 
   # ══════════════════════════════════════════════════════════
   # STAGE 3: Docker Build & Push
@@ -210,11 +200,9 @@ jobs:
           BRANCH="${{ github.ref_name }}"
           BASE="${{ inputs.docker-user }}/${{ inputs.image-name }}"
 
-          # Always tag with SHA for traceability
           TAGS="${BASE}:sha-${SHA_SHORT}"
           TAGS="${TAGS},${BASE}:${BRANCH}"
 
-          # Tag with 'latest' only on main branch
           if [ "${BRANCH}" = "main" ]; then
             TAGS="${TAGS},${BASE}:latest"
           fi
